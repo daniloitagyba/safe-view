@@ -71,17 +71,17 @@ jobs:
 
       - name: Write API .env
         run: |
-          ssh ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} "cat > ${{ env.DEPLOY_PATH }}/apps/api/.env" << EOF
-NODE_ENV="production"
-DATABASE_URL="${{ vars.DATABASE_URL }}"
-GOOGLE_CLIENT_ID="${{ vars.GOOGLE_CLIENT_ID }}"
-GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
-JWT_SECRET="${{ secrets.JWT_SECRET }}"
-ALCHEMY_API_KEY="${{ secrets.ALCHEMY_API_KEY }}"
-REDIS_URL="${{ secrets.REDIS_URL }}"
-FRONTEND_URL="${{ vars.FRONTEND_URL }}"
-PORT=${{ vars.PORT }}
-EOF
+          {
+            echo 'NODE_ENV="production"'
+            echo 'DATABASE_URL="${{ vars.DATABASE_URL }}"'
+            echo 'GOOGLE_CLIENT_ID="${{ vars.GOOGLE_CLIENT_ID }}"'
+            echo 'GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"'
+            echo 'JWT_SECRET="${{ secrets.JWT_SECRET }}"'
+            echo 'ALCHEMY_API_KEY="${{ secrets.ALCHEMY_API_KEY }}"'
+            echo 'REDIS_URL="${{ secrets.REDIS_URL }}"'
+            echo 'FRONTEND_URL="${{ vars.FRONTEND_URL }}"'
+            echo 'PORT=${{ vars.PORT }}'
+          } | ssh ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} "cat > ${{ env.DEPLOY_PATH }}/apps/api/.env"
 
       - name: Post-deploy setup
         run: |
