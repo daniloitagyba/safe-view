@@ -16,7 +16,6 @@ import {
 import {
   Delete,
   ExpandMore,
-  ExpandLess,
   ContentCopy,
   Edit,
   Check,
