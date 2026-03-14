@@ -72,16 +72,16 @@ jobs:
       - name: Write API .env
         run: |
           ssh ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} "cat > ${{ env.DEPLOY_PATH }}/apps/api/.env" << EOF
-          NODE_ENV="production"
-          DATABASE_URL="${{ vars.DATABASE_URL }}"
-          GOOGLE_CLIENT_ID="${{ vars.GOOGLE_CLIENT_ID }}"
-          GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
-          JWT_SECRET="${{ secrets.JWT_SECRET }}"
-          ALCHEMY_API_KEY="${{ secrets.ALCHEMY_API_KEY }}"
-          REDIS_URL="${{ secrets.REDIS_URL }}"
-          FRONTEND_URL="${{ vars.FRONTEND_URL }}"
-          PORT=${{ vars.PORT }}
-          EOF
+NODE_ENV="production"
+DATABASE_URL="${{ vars.DATABASE_URL }}"
+GOOGLE_CLIENT_ID="${{ vars.GOOGLE_CLIENT_ID }}"
+GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
+JWT_SECRET="${{ secrets.JWT_SECRET }}"
+ALCHEMY_API_KEY="${{ secrets.ALCHEMY_API_KEY }}"
+REDIS_URL="${{ secrets.REDIS_URL }}"
+FRONTEND_URL="${{ vars.FRONTEND_URL }}"
+PORT=${{ vars.PORT }}
+EOF
 
       - name: Post-deploy setup
         run: |
