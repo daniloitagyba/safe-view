@@ -37,6 +37,9 @@ jobs:
 
       - name: Build Web
         run: pnpm --filter @safe-view/web build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
 
       - name: Install cloudflared
         run: |
@@ -79,10 +82,15 @@ jobs:
 
             cd /opt/safe-view
 
-            pnpm install --frozen-lockfile --prod
+            pnpm install --frozen-lockfile
 
             cd apps/api && npx prisma generate && npx prisma migrate deploy && cd ../..
 
             pm2 describe safe-view-api > /dev/null 2>&1 && pm2 restart safe-view-api || pm2 start apps/api/dist/server.js --name safe-view-api --cwd /opt/safe-view
             pm2 save
+
+            sudo cp /opt/safe-view/nginx/safe-view.conf /etc/nginx/sites-available/safe-view
+            sudo ln -sf /etc/nginx/sites-available/safe-view /etc/nginx/sites-enabled/safe-view
+            sudo rm -f /etc/nginx/sites-enabled/default
+            sudo nginx -t && sudo systemctl reload nginx
           REMOTE
