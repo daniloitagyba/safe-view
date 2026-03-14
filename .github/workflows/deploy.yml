@@ -36,8 +36,8 @@ jobs:
       - name: Build Web
         run: pnpm --filter @safe-view/web build
         env:
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
 
       - name: Install cloudflared
         run: |
@@ -50,24 +50,14 @@ jobs:
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
-      - name: Debug secrets
-        run: |
-          echo "VPS_HOST length: ${#VPS_HOST}"
-          echo "VPS_USER length: ${#VPS_USER}"
-          echo "VPS_SSH_KEY length: ${#VPS_SSH_KEY}"
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-
-      - name: Configure SSH over Cloudflare Tunnel
+- name: Configure SSH over Cloudflare Tunnel
         run: |
           printf "Host %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  StrictHostKeyChecking no\n  ProxyCommand cloudflared access ssh --hostname %%h\n" "$VPS_HOST" "$VPS_USER" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
           cat ~/.ssh/config
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ vars.VPS_HOST }}
+          VPS_USER: ${{ vars.VPS_USER }}
 
       - name: Deploy files via rsync
         run: |
@@ -78,11 +68,11 @@ jobs:
             --exclude='apps/api/.env' \
             --exclude='apps/api/*.db' \
             --exclude='apps/api/*.db-journal' \
-            ./ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:${{ env.DEPLOY_PATH }}/
+            ./ ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:${{ env.DEPLOY_PATH }}/
 
       - name: Post-deploy setup
         run: |
-          ssh ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'REMOTE'
+          ssh ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} << 'REMOTE'
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
             export PATH="$HOME/.local/share/pnpm:$PATH"
