@@ -65,8 +65,8 @@ jobs:
             --exclude='.github/' \
             --exclude='node_modules/' \
             --exclude='apps/api/.env' \
-            --exclude='apps/api/*.db' \
-            --exclude='apps/api/*.db-journal' \
+            --exclude='*.db' \
+            --exclude='*.db-journal' \
             ./ ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:${{ env.DEPLOY_PATH }}/
 
       - name: Post-deploy setup
