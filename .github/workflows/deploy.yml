@@ -49,8 +49,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-
-- name: Configure SSH over Cloudflare Tunnel
+      - name: Configure SSH over Cloudflare Tunnel
         run: |
           printf "Host %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  StrictHostKeyChecking no\n  ProxyCommand cloudflared access ssh --hostname %%h\n" "$VPS_HOST" "$VPS_USER" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
