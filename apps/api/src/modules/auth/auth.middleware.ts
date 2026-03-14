@@ -12,6 +12,7 @@ export async function authenticate(
 ) {
   const authorization = request.headers.authorization;
   if (!authorization?.startsWith("Bearer ")) {
+    request.log.warn("Auth failed: missing or malformed Authorization header");
     return reply.status(401).send({ error: "Unauthorized" });
   }
 
@@ -19,7 +20,8 @@ export async function authenticate(
     const token = authorization.slice(7);
     const decoded = jwt.verify(token, env.JWT_SECRET) as AuthPayload;
     (request as FastifyRequest & { userId: string }).userId = decoded.userId;
-  } catch {
+  } catch (err) {
+    request.log.warn({ err }, "Auth failed: invalid token");
     return reply.status(401).send({ error: "Invalid token" });
   }
 }
