@@ -68,7 +68,8 @@ async function alchemyRpc<T>(
   const data = (await response.json()) as AlchemyRpcResponse<T>;
 
   if (data.error) {
-    throw new Error(`Alchemy API error: ${data.error.message}`);
+    console.error(`Alchemy RPC error [${method}]: ${data.error.message}`);
+    throw new Error("Failed to fetch blockchain data");
   }
 
   return data.result;
@@ -218,7 +219,7 @@ export async function getEthPrices(): Promise<EthPrices> {
     const data = (await response.json()) as Record<string, number>;
 
     if (!data.USD) {
-      throw new Error("Failed to fetch ETH prices from CryptoCompare");
+      throw new Error("Failed to fetch ETH prices");
     }
 
     return { usd: data.USD, eur: data.EUR, brl: data.BRL };

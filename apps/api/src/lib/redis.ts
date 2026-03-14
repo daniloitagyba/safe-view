@@ -8,7 +8,13 @@ export const redis = new Redis(env.REDIS_URL, {
 export async function getJson<T>(key: string): Promise<T | null> {
   const raw = await redis.get(key);
   if (!raw) return null;
-  return JSON.parse(raw) as T;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    console.error(`Corrupted JSON in Redis key: ${key}`);
+    await redis.del(key);
+    return null;
+  }
 }
 
 export async function setJson<T>(

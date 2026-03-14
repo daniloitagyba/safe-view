@@ -12,7 +12,11 @@ const googleTokenSchema = z.object({
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 
 export async function authRoutes(app: FastifyInstance) {
-  app.post("/auth/google", async (request, reply) => {
+  app.post("/auth/google", {
+    config: {
+      rateLimit: { max: 5, timeWindow: "1 minute" },
+    },
+  }, async (request, reply) => {
     const { credential } = googleTokenSchema.parse(request.body);
 
     const ticket = await googleClient.verifyIdToken({
