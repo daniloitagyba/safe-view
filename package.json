@@ -1,0 +1,19 @@
+{
+  "name": "safe-view",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wallet viewer",
+  "scripts": {
+    "dev": "pnpm --parallel -r dev",
+    "dev:api": "pnpm --filter @safe-view/api dev",
+    "dev:web": "pnpm --filter @safe-view/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "db:migrate": "pnpm --filter @safe-view/api db:migrate",
+    "db:generate": "pnpm --filter @safe-view/api db:generate"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.27.0"
+}
