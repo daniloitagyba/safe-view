@@ -14,9 +14,11 @@
   "dependencies": {
     "@fastify/cors": "^11.2.0",
     "@prisma/client": "^6.19.2",
+    "bullmq": "^5.71.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.8.2",
     "google-auth-library": "^10.6.1",
+    "ioredis": "^5.10.0",
     "jsonwebtoken": "^9.0.3",
     "zod": "^4.3.6"
   },

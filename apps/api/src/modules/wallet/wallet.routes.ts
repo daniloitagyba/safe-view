@@ -2,12 +2,15 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { authenticate } from "../auth/auth.middleware.js";
+import { getJson } from "../../lib/redis.js";
 import {
-  getEthBalance,
-  getTokenBalances,
-  getEthPrices,
-} from "../../lib/alchemy.js";
-import type { FiatCurrency } from "../../lib/alchemy.js";
+  enqueueSyncWallet,
+  invalidateAndSync,
+  waitForSync,
+  cleanupAddress,
+  KEYS,
+} from "../../lib/sync-worker.js";
+import type { FiatCurrency, CachedWalletData } from "../../lib/alchemy.js";
 
 const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
 
@@ -29,6 +32,38 @@ const balancesQuerySchema = z.object({
 });
 
 type AuthenticatedRequest = FastifyRequest & { userId: string };
+
+function buildBalancesResponse(
+  address: string,
+  currency: FiatCurrency,
+  data: CachedWalletData
+) {
+  const ethBalance = parseFloat(data.ethBalanceWei) / 1e18;
+  const ethPrice = data.ethPrices[currency];
+
+  const tokensWithValue = data.tokens.map((token) => ({
+    ...token,
+    valueFiat: token.prices
+      ? token.balanceFormatted * token.prices[currency]
+      : null,
+  }));
+
+  const tokensTotal = tokensWithValue.reduce(
+    (sum, t) => sum + (t.valueFiat ?? 0),
+    0
+  );
+
+  return {
+    address,
+    currency,
+    ethBalance,
+    ethPrice,
+    ethValue: ethBalance * ethPrice,
+    totalValue: ethBalance * ethPrice + tokensTotal,
+    tokens: tokensWithValue,
+    syncedAt: data.syncedAt,
+  };
+}
 
 export async function walletRoutes(app: FastifyInstance) {
   app.addHook("onRequest", authenticate);
@@ -68,6 +103,9 @@ export async function walletRoutes(app: FastifyInstance) {
       },
     });
 
+    // Enqueue background sync for the new wallet
+    await enqueueSyncWallet(normalizedAddress, 1);
+
     return reply.status(201).send({ wallet });
   });
 
@@ -106,9 +144,13 @@ export async function walletRoutes(app: FastifyInstance) {
 
     await prisma.wallet.delete({ where: { id } });
 
+    // Clean up Redis if no one else uses this address
+    await cleanupAddress(wallet.address);
+
     return reply.status(204).send();
   });
 
+  // GET /wallets/:id/balances — reads from Redis cache
   app.get("/wallets/:id/balances", async (request, reply) => {
     const { userId } = request as AuthenticatedRequest;
     const { id } = walletParamsSchema.parse(request.params);
@@ -123,33 +165,53 @@ export async function walletRoutes(app: FastifyInstance) {
 
     const { currency } = balancesQuerySchema.parse(request.query);
 
-    const [ethBalanceWei, tokens, ethPrices] = await Promise.all([
-      getEthBalance(wallet.address),
-      getTokenBalances(wallet.address),
-      getEthPrices(),
-    ]);
-
-    const ethBalance = parseFloat(ethBalanceWei) / 1e18;
-    const ethPrice = ethPrices[currency];
-
-    const tokensWithValue = tokens.map((token) => ({
-      ...token,
-      valueFiat: token.prices ? token.balanceFormatted * token.prices[currency] : null,
-    }));
-
-    const tokensTotal = tokensWithValue.reduce(
-      (sum, t) => sum + (t.valueFiat ?? 0),
-      0
+    // Try cache first
+    let data = await getJson<CachedWalletData>(
+      KEYS.walletData(wallet.address)
     );
 
-    return {
-      address: wallet.address,
-      currency,
-      ethBalance,
-      ethPrice,
-      ethValue: ethBalance * ethPrice,
-      totalValue: ethBalance * ethPrice + tokensTotal,
-      tokens: tokensWithValue,
-    };
+    // Cache miss: enqueue and wait
+    if (!data) {
+      try {
+        data = await waitForSync(wallet.address, 15_000);
+      } catch {
+        return reply
+          .status(504)
+          .send({ error: "Sync timed out. Try again shortly." });
+      }
+    }
+
+    if (!data) {
+      return reply
+        .status(504)
+        .send({ error: "Sync timed out. Try again shortly." });
+    }
+
+    return buildBalancesResponse(wallet.address, currency, data);
+  });
+
+  // POST /wallets/:id/refresh — invalidates cache, syncs immediately
+  app.post("/wallets/:id/refresh", async (request, reply) => {
+    const { userId } = request as AuthenticatedRequest;
+    const { id } = walletParamsSchema.parse(request.params);
+
+    const wallet = await prisma.wallet.findFirst({
+      where: { id, userId },
+    });
+
+    if (!wallet) {
+      return reply.status(404).send({ error: "Wallet not found" });
+    }
+
+    const { currency } = balancesQuerySchema.parse(request.query);
+
+    try {
+      const data = await invalidateAndSync(wallet.address);
+      return buildBalancesResponse(wallet.address, currency, data);
+    } catch {
+      return reply
+        .status(504)
+        .send({ error: "Sync timed out. Try again shortly." });
+    }
   });
 }

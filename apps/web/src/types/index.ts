@@ -35,4 +35,5 @@ export interface WalletBalances {
   ethValue: number;
   totalValue: number;
   tokens: TokenBalance[];
+  syncedAt?: number;
 }

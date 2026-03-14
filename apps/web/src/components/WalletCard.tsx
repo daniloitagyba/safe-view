@@ -20,6 +20,7 @@ import {
   Edit,
   Check,
   Close,
+  Refresh,
 } from "@mui/icons-material";
 import toast from "react-hot-toast";
 import type { Wallet, FiatCurrency, TokenBalance } from "../types";
@@ -67,6 +68,16 @@ function shouldShow(valueFiat: number | null, hide: boolean): boolean {
   if (!hide) return true;
   if (valueFiat === null) return true;
   return valueFiat >= 1;
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 10) return "just now";
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
 }
 
 const ETH_LOGO =
@@ -166,10 +177,8 @@ export function WalletCard({
   const [expanded, setExpanded] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editLabel, setEditLabel] = useState(wallet.label ?? "");
-  const { balances, isLoading, error } = useWalletBalances(
-    wallet.id,
-    currency
-  );
+  const { balances, isLoading, isRefreshing, error, refreshBalances } =
+    useWalletBalances(wallet.id, currency);
 
   useEffect(() => {
     onTotalChange?.(wallet.id, balances?.totalValue ?? 0);
@@ -302,12 +311,31 @@ export function WalletCard({
               <Box sx={{ textAlign: "right", display: { xs: "none", sm: "block" }, mr: 1 }}>
                 <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
                   Total
+                  {balances.syncedAt && (
+                    <> &middot; {formatTimeAgo(balances.syncedAt)}</>
+                  )}
                 </Typography>
                 <Typography variant="subtitle1" fontWeight={700} color="primary.main">
                   {formatFiat(balances.totalValue, currency)}
                 </Typography>
               </Box>
             )}
+            <Tooltip title="Refresh balances">
+              <IconButton
+                size="small"
+                onClick={refreshBalances}
+                disabled={isRefreshing}
+                sx={{
+                  animation: isRefreshing ? "spin 1s linear infinite" : "none",
+                  "@keyframes spin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
+                }}
+              >
+                <Refresh fontSize="small" />
+              </IconButton>
+            </Tooltip>
             <Tooltip title={expanded ? "Collapse" : "Expand"}>
               <IconButton
                 size="small"

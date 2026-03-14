@@ -5,37 +5,6 @@ const CRYPTOCOMPARE_URL =
   "https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD,EUR,BRL";
 
 // ---------------------------------------------------------------------------
-// Cache
-// ---------------------------------------------------------------------------
-
-interface CacheEntry<T> {
-  data: T;
-  expiresAt: number;
-}
-
-const cache = new Map<string, CacheEntry<unknown>>();
-
-function getCached<T>(key: string): T | null {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(key);
-    return null;
-  }
-  return entry.data as T;
-}
-
-function setCache<T>(key: string, data: T, ttlMs: number): void {
-  cache.set(key, { data, expiresAt: Date.now() + ttlMs });
-}
-
-const TTL = {
-  PRICES: 60_000,         // 60s  — prices don't change every second
-  BALANCE: 30_000,        // 30s  — balances update infrequently
-  TOKEN_METADATA: 600_000, // 10min — name/symbol/logo are static
-} as const;
-
-// ---------------------------------------------------------------------------
 // Retry with exponential backoff
 // ---------------------------------------------------------------------------
 
@@ -79,7 +48,7 @@ interface AlchemyTokenBalancesResult {
   tokenBalances: AlchemyTokenBalance[];
 }
 
-interface AlchemyTokenMetadata {
+export interface AlchemyTokenMetadata {
   name: string;
   symbol: string;
   decimals: number;
@@ -106,7 +75,7 @@ async function alchemyRpc<T>(
 }
 
 // ---------------------------------------------------------------------------
-// Public API
+// Public types
 // ---------------------------------------------------------------------------
 
 export type FiatCurrency = "usd" | "eur" | "brl";
@@ -128,27 +97,27 @@ export interface TokenBalance {
   prices: EthPrices | null;
 }
 
-export async function getEthBalance(address: string): Promise<string> {
-  const cacheKey = `eth_balance:${address}`;
-  const cached = getCached<string>(cacheKey);
-  if (cached !== null) return cached;
+export interface CachedWalletData {
+  ethBalanceWei: string;
+  tokens: TokenBalance[];
+  ethPrices: EthPrices;
+  syncedAt: number;
+}
 
+// ---------------------------------------------------------------------------
+// Public API — pure calls, no cache (worker handles caching via Redis)
+// ---------------------------------------------------------------------------
+
+export async function getEthBalance(address: string): Promise<string> {
   const hexBalance = await withRetry(() =>
     alchemyRpc<string>("eth_getBalance", [address, "latest"])
   );
-
-  const balance = BigInt(hexBalance).toString();
-  setCache(cacheKey, balance, TTL.BALANCE);
-  return balance;
+  return BigInt(hexBalance).toString();
 }
 
 export async function getTokenBalances(
   address: string
 ): Promise<TokenBalance[]> {
-  const cacheKey = `token_balances:${address}`;
-  const cached = getCached<TokenBalance[]>(cacheKey);
-  if (cached !== null) return cached;
-
   const result = await withRetry(() =>
     alchemyRpc<AlchemyTokenBalancesResult>("alchemy_getTokenBalances", [
       address,
@@ -160,10 +129,7 @@ export async function getTokenBalances(
     (t) => t.tokenBalance !== "0x" && BigInt(t.tokenBalance) > 0n
   );
 
-  if (nonZeroTokens.length === 0) {
-    setCache(cacheKey, [], TTL.BALANCE);
-    return [];
-  }
+  if (nonZeroTokens.length === 0) return [];
 
   const metadataList: { token: AlchemyTokenBalance; metadata: AlchemyTokenMetadata }[] = [];
 
@@ -181,7 +147,7 @@ export async function getTokenBalances(
     .filter(Boolean);
   const priceMap = await getTokenPrices(symbols);
 
-  const balances: TokenBalance[] = metadataList.map(({ token, metadata }) => {
+  return metadataList.map(({ token, metadata }) => {
     const decimals = metadata.decimals || 18;
     const rawBalance = BigInt(token.tokenBalance).toString();
     const balanceFormatted =
@@ -201,9 +167,6 @@ export async function getTokenBalances(
       prices: priceMap.get(symbol) ?? null,
     };
   });
-
-  setCache(cacheKey, balances, TTL.BALANCE);
-  return balances;
 }
 
 type CryptoComparePriceMulti = Record<string, Record<string, number>>;
@@ -215,9 +178,6 @@ async function getTokenPrices(
   if (symbols.length === 0) return result;
 
   const unique = [...new Set(symbols.map((s) => s.toUpperCase()))];
-  const cacheKey = `token_prices:${unique.sort().join(",")}`;
-  const cached = getCached<Map<string, EthPrices>>(cacheKey);
-  if (cached !== null) return cached;
 
   try {
     const url = `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${unique.join(",")}&tsyms=USD,EUR,BRL`;
@@ -239,33 +199,21 @@ async function getTokenPrices(
     // Return partial/empty results if price fetch fails
   }
 
-  setCache(cacheKey, result, TTL.PRICES);
   return result;
 }
 
 async function getTokenMetadata(
   contractAddress: string
 ): Promise<AlchemyTokenMetadata> {
-  const cacheKey = `token_meta:${contractAddress}`;
-  const cached = getCached<AlchemyTokenMetadata>(cacheKey);
-  if (cached !== null) return cached;
-
-  const metadata = await withRetry(() =>
+  return withRetry(() =>
     alchemyRpc<AlchemyTokenMetadata>("alchemy_getTokenMetadata", [
       contractAddress,
     ])
   );
-
-  setCache(cacheKey, metadata, TTL.TOKEN_METADATA);
-  return metadata;
 }
 
 export async function getEthPrices(): Promise<EthPrices> {
-  const cacheKey = "eth_prices";
-  const cached = getCached<EthPrices>(cacheKey);
-  if (cached !== null) return cached;
-
-  const prices = await withRetry(async () => {
+  return withRetry(async () => {
     const response = await fetch(CRYPTOCOMPARE_URL);
     const data = (await response.json()) as Record<string, number>;
 
@@ -275,7 +223,4 @@ export async function getEthPrices(): Promise<EthPrices> {
 
     return { usd: data.USD, eur: data.EUR, brl: data.BRL };
   });
-
-  setCache(cacheKey, prices, TTL.PRICES);
-  return prices;
 }

@@ -47,6 +47,7 @@ export function useWalletBalances(
 ) {
   const [balances, setBalances] = useState<WalletBalances | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchBalances = useCallback(async () => {
@@ -67,9 +68,27 @@ export function useWalletBalances(
     }
   }, [walletId, currency]);
 
+  const refreshBalances = useCallback(async () => {
+    if (!walletId) return;
+    setIsRefreshing(true);
+    setError(null);
+    try {
+      const res = await api.post(`/api/wallets/${walletId}/refresh`, {}, {
+        params: { currency },
+      });
+      setBalances(res.data);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to refresh balances"
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [walletId, currency]);
+
   useEffect(() => {
     fetchBalances();
   }, [fetchBalances]);
 
-  return { balances, isLoading, error, refetch: fetchBalances };
+  return { balances, isLoading, isRefreshing, error, refetch: fetchBalances, refreshBalances };
 }

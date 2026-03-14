@@ -82,7 +82,10 @@ jobs:
 
             cd apps/api && npx prisma generate && npx prisma migrate deploy && cd ../..
 
-            pm2 describe safe-view-api > /dev/null 2>&1 && pm2 restart safe-view-api || pm2 start apps/api/dist/server.js --name safe-view-api --cwd /opt/safe-view
+            # Ensure Redis is running
+            sudo systemctl is-active --quiet redis-server || sudo systemctl start redis-server
+
+            pm2 describe safe-view-api > /dev/null 2>&1 && pm2 restart safe-view-api || pm2 start dist/server.js --name safe-view-api --cwd /opt/safe-view/apps/api
             pm2 save
 
             sudo cp /opt/safe-view/nginx/safe-view.conf /etc/nginx/sites-available/safe-view
