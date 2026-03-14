@@ -1,83 +1,9 @@
 import { env } from "../config/env.js";
+import { logger } from "./logger.js";
 
 const ALCHEMY_URL = `https://eth-mainnet.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}`;
-const CRYPTOCOMPARE_URL =
+const CRYPTOCOMPARE_PRICES_URL =
   "https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD,EUR,BRL";
-
-// ---------------------------------------------------------------------------
-// Retry with exponential backoff
-// ---------------------------------------------------------------------------
-
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxAttempts = 3,
-  baseDelayMs = 500
-): Promise<T> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (err) {
-      lastError = err;
-      if (attempt < maxAttempts - 1) {
-        await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** attempt));
-      }
-    }
-  }
-  throw lastError;
-}
-
-// ---------------------------------------------------------------------------
-// Alchemy RPC
-// ---------------------------------------------------------------------------
-
-interface AlchemyRpcResponse<T> {
-  jsonrpc: string;
-  id: number;
-  result: T;
-  error?: { code: number; message: string };
-}
-
-interface AlchemyTokenBalance {
-  contractAddress: string;
-  tokenBalance: string;
-}
-
-interface AlchemyTokenBalancesResult {
-  address: string;
-  tokenBalances: AlchemyTokenBalance[];
-}
-
-export interface AlchemyTokenMetadata {
-  name: string;
-  symbol: string;
-  decimals: number;
-  logo: string | null;
-}
-
-async function alchemyRpc<T>(
-  method: string,
-  params: unknown[]
-): Promise<T> {
-  const response = await fetch(ALCHEMY_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-
-  const data = (await response.json()) as AlchemyRpcResponse<T>;
-
-  if (data.error) {
-    console.error(`Alchemy RPC error [${method}]: ${data.error.message}`);
-    throw new Error("Failed to fetch blockchain data");
-  }
-
-  return data.result;
-}
-
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
 
 export type FiatCurrency = "usd" | "eur" | "brl";
 
@@ -105,76 +31,75 @@ export interface CachedWalletData {
   syncedAt: number;
 }
 
-// ---------------------------------------------------------------------------
-// Public API — pure calls, no cache (worker handles caching via Redis)
-// ---------------------------------------------------------------------------
-
-export async function getEthBalance(address: string): Promise<string> {
-  const hexBalance = await withRetry(() =>
-    alchemyRpc<string>("eth_getBalance", [address, "latest"])
-  );
-  return BigInt(hexBalance).toString();
+interface AlchemyRpcResponse<T> {
+  jsonrpc: string;
+  id: number;
+  result: T;
+  error?: { code: number; message: string };
 }
 
-export async function getTokenBalances(
-  address: string
-): Promise<TokenBalance[]> {
-  const result = await withRetry(() =>
-    alchemyRpc<AlchemyTokenBalancesResult>("alchemy_getTokenBalances", [
-      address,
-      "erc20",
-    ])
-  );
+interface AlchemyTokenBalance {
+  contractAddress: string;
+  tokenBalance: string;
+}
 
-  const nonZeroTokens = result.tokenBalances.filter(
-    (t) => t.tokenBalance !== "0x" && BigInt(t.tokenBalance) > 0n
-  );
+interface AlchemyTokenBalancesResult {
+  address: string;
+  tokenBalances: AlchemyTokenBalance[];
+}
 
-  if (nonZeroTokens.length === 0) return [];
-
-  const metadataList: { token: AlchemyTokenBalance; metadata: AlchemyTokenMetadata }[] = [];
-
-  for (const token of nonZeroTokens) {
-    try {
-      const metadata = await getTokenMetadata(token.contractAddress);
-      metadataList.push({ token, metadata });
-    } catch {
-      // Skip tokens that fail metadata fetch
-    }
-  }
-
-  const symbols = metadataList
-    .map((m) => m.metadata.symbol)
-    .filter(Boolean);
-  const priceMap = await getTokenPrices(symbols);
-
-  return metadataList.map(({ token, metadata }) => {
-    const decimals = metadata.decimals || 18;
-    const rawBalance = BigInt(token.tokenBalance).toString();
-    const balanceFormatted =
-      Number(BigInt(token.tokenBalance)) / Math.pow(10, decimals);
-    const symbol = (metadata.symbol || "").toUpperCase();
-
-    return {
-      contractAddress: token.contractAddress,
-      tokenName: metadata.name || "Unknown",
-      tokenSymbol: metadata.symbol || "???",
-      tokenDecimal: decimals,
-      balance: rawBalance,
-      balanceFormatted,
-      imageUrl:
-        metadata.logo ||
-        `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/${token.contractAddress}/logo.png`,
-      prices: priceMap.get(symbol) ?? null,
-    };
-  });
+export interface AlchemyTokenMetadata {
+  name: string;
+  symbol: string;
+  decimals: number;
+  logo: string | null;
 }
 
 type CryptoComparePriceMulti = Record<string, Record<string, number>>;
 
-async function getTokenPrices(
-  symbols: string[]
-): Promise<Map<string, EthPrices>> {
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelayMs = 500
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (attempt < maxAttempts - 1) {
+        await new Promise((r) => setTimeout(r, baseDelayMs * 2 ** attempt));
+      }
+    }
+  }
+  throw lastError;
+}
+
+async function alchemyRpc<T>(method: string, params: unknown[]): Promise<T> {
+  const response = await fetch(ALCHEMY_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+
+  const data = (await response.json()) as AlchemyRpcResponse<T>;
+
+  if (data.error) {
+    logger.error({ method, code: data.error.code }, data.error.message);
+    throw new Error("Failed to fetch blockchain data");
+  }
+
+  return data.result;
+}
+
+async function getTokenMetadata(contractAddress: string): Promise<AlchemyTokenMetadata> {
+  return withRetry(() =>
+    alchemyRpc<AlchemyTokenMetadata>("alchemy_getTokenMetadata", [contractAddress])
+  );
+}
+
+async function getTokenPrices(symbols: string[]): Promise<Map<string, EthPrices>> {
   const result = new Map<string, EthPrices>();
   if (symbols.length === 0) return result;
 
@@ -197,25 +122,69 @@ async function getTokenPrices(
       }
     }
   } catch {
-    // Return partial/empty results if price fetch fails
+    // partial/empty results on failure
   }
 
   return result;
 }
 
-async function getTokenMetadata(
-  contractAddress: string
-): Promise<AlchemyTokenMetadata> {
-  return withRetry(() =>
-    alchemyRpc<AlchemyTokenMetadata>("alchemy_getTokenMetadata", [
-      contractAddress,
-    ])
+function buildTokenLogoUrl(contractAddress: string): string {
+  return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/${contractAddress}/logo.png`;
+}
+
+export async function getEthBalance(address: string): Promise<string> {
+  const hexBalance = await withRetry(() =>
+    alchemyRpc<string>("eth_getBalance", [address, "latest"])
   );
+  return BigInt(hexBalance).toString();
+}
+
+export async function getTokenBalances(address: string): Promise<TokenBalance[]> {
+  const result = await withRetry(() =>
+    alchemyRpc<AlchemyTokenBalancesResult>("alchemy_getTokenBalances", [address, "erc20"])
+  );
+
+  const nonZeroTokens = result.tokenBalances.filter(
+    (t) => t.tokenBalance !== "0x" && BigInt(t.tokenBalance) > 0n
+  );
+
+  if (nonZeroTokens.length === 0) return [];
+
+  const metadataList: { token: AlchemyTokenBalance; metadata: AlchemyTokenMetadata }[] = [];
+
+  for (const token of nonZeroTokens) {
+    try {
+      const metadata = await getTokenMetadata(token.contractAddress);
+      metadataList.push({ token, metadata });
+    } catch {
+      // skip tokens with unreachable metadata
+    }
+  }
+
+  const symbols = metadataList.map((m) => m.metadata.symbol).filter(Boolean);
+  const priceMap = await getTokenPrices(symbols);
+
+  return metadataList.map(({ token, metadata }) => {
+    const decimals = metadata.decimals || 18;
+    const balanceFormatted = Number(BigInt(token.tokenBalance)) / Math.pow(10, decimals);
+    const symbol = (metadata.symbol || "").toUpperCase();
+
+    return {
+      contractAddress: token.contractAddress,
+      tokenName: metadata.name || "Unknown",
+      tokenSymbol: metadata.symbol || "???",
+      tokenDecimal: decimals,
+      balance: BigInt(token.tokenBalance).toString(),
+      balanceFormatted,
+      imageUrl: metadata.logo || buildTokenLogoUrl(token.contractAddress),
+      prices: priceMap.get(symbol) ?? null,
+    };
+  });
 }
 
 export async function getEthPrices(): Promise<EthPrices> {
   return withRetry(async () => {
-    const response = await fetch(CRYPTOCOMPARE_URL);
+    const response = await fetch(CRYPTOCOMPARE_PRICES_URL);
     const data = (await response.json()) as Record<string, number>;
 
     if (!data.USD) {

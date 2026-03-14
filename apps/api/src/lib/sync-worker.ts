@@ -1,6 +1,7 @@
 import { Queue, QueueEvents, Worker, type Job } from "bullmq";
 import { redisOptions, getJson, setJson, del } from "./redis.js";
 import { prisma } from "./prisma.js";
+import { logger } from "./logger.js";
 import {
   getEthBalance,
   getTokenBalances,
@@ -9,8 +10,17 @@ import {
 } from "./alchemy.js";
 
 const QUEUE_NAME = "wallet-sync";
+const SYNC_INTERVAL_MS = 120_000;
+const WALLET_DATA_TTL = 120;
+const ETH_PRICES_TTL = 60;
+const SYNC_TIMEOUT_MS = 15_000;
 
-export const syncQueue = new Queue(QUEUE_NAME, {
+export const KEYS = {
+  walletData: (address: string) => `sv:wallet_data:${address}`,
+  ethPrices: () => "sv:eth_prices",
+} as const;
+
+const syncQueue = new Queue(QUEUE_NAME, {
   connection: redisOptions,
   defaultJobOptions: {
     removeOnComplete: 100,
@@ -22,23 +32,10 @@ export const syncQueue = new Queue(QUEUE_NAME, {
 
 const queueEvents = new QueueEvents(QUEUE_NAME, { connection: redisOptions });
 
-// ---------------------------------------------------------------------------
-// Redis key helpers
-// ---------------------------------------------------------------------------
-
-export const KEYS = {
-  walletData: (address: string) => `sv:wallet_data:${address}`,
-  ethPrices: () => "sv:eth_prices",
-  tokenMeta: (contract: string) => `sv:token_meta:${contract}`,
-} as const;
-
-// ---------------------------------------------------------------------------
-// Job processor
-// ---------------------------------------------------------------------------
+let worker: Worker | null = null;
 
 async function processSyncWallet(job: Job<{ address: string }>) {
   const { address } = job.data;
-  job.log(`Syncing wallet ${address}`);
 
   const [ethBalanceWei, tokens, ethPrices] = await Promise.all([
     getEthBalance(address),
@@ -53,20 +50,17 @@ async function processSyncWallet(job: Job<{ address: string }>) {
     syncedAt: Date.now(),
   };
 
-  await setJson(KEYS.walletData(address), walletData, 120);
-  await setJson(KEYS.ethPrices(), ethPrices, 60);
+  await setJson(KEYS.walletData(address), walletData, WALLET_DATA_TTL);
+  await setJson(KEYS.ethPrices(), ethPrices, ETH_PRICES_TTL);
 
-  job.log(`Synced wallet ${address}: ETH=${ethBalanceWei}, tokens=${tokens.length}`);
   return walletData;
 }
 
-async function processSyncAll(job: Job) {
+async function processSyncAll() {
   const wallets = await prisma.wallet.findMany({
     select: { address: true },
     distinct: ["address"],
   });
-
-  job.log(`Enqueueing sync for ${wallets.length} unique addresses`);
 
   for (const { address } of wallets) {
     await syncQueue.add("sync-wallet", { address }, {
@@ -78,18 +72,12 @@ async function processSyncAll(job: Job) {
   return { synced: wallets.length };
 }
 
-// ---------------------------------------------------------------------------
-// Worker
-// ---------------------------------------------------------------------------
-
-let worker: Worker | null = null;
-
 export function initWorker() {
   worker = new Worker(
     QUEUE_NAME,
     async (job) => {
       if (job.name === "sync-wallet") return processSyncWallet(job);
-      if (job.name === "sync-all") return processSyncAll(job);
+      if (job.name === "sync-all") return processSyncAll();
       throw new Error(`Unknown job: ${job.name}`);
     },
     {
@@ -100,41 +88,33 @@ export function initWorker() {
   );
 
   worker.on("completed", (job) => {
-    console.log(`[worker] Job ${job.name} completed (${job.id})`);
+    logger.info({ job: job.name, id: job.id }, "Job completed");
   });
 
   worker.on("failed", (job, err) => {
-    console.error(`[worker] Job ${job?.name} failed: ${err.message}`);
+    logger.error({ job: job?.name, err: err.message }, "Job failed");
   });
 
-  // Schedule recurring sync-all every 2 minutes
   syncQueue.upsertJobScheduler(
     "sync-all-scheduler",
-    { every: 120_000 },
+    { every: SYNC_INTERVAL_MS },
     { name: "sync-all" }
   );
 
-  console.log("[worker] Worker started");
+  logger.info("Worker started");
   return worker;
 }
 
 export async function shutdownWorker() {
   if (worker) {
     await worker.close();
-    console.log("[worker] Worker stopped");
+    logger.info("Worker stopped");
   }
   await queueEvents.close();
   await syncQueue.close();
 }
 
-// ---------------------------------------------------------------------------
-// Public helpers
-// ---------------------------------------------------------------------------
-
-export async function enqueueSyncWallet(
-  address: string,
-  priority = 10
-): Promise<void> {
+export async function enqueueSyncWallet(address: string, priority = 10): Promise<void> {
   await syncQueue.add("sync-wallet", { address }, {
     jobId: `sync-wallet-${address}-${Date.now()}`,
     priority,
@@ -149,23 +129,19 @@ export async function invalidateAndSync(address: string): Promise<CachedWalletDa
     priority: 1,
   });
 
-  const result = await job.waitUntilFinished(queueEvents, 15_000);
-  return result as CachedWalletData;
+  return await job.waitUntilFinished(queueEvents, SYNC_TIMEOUT_MS) as CachedWalletData;
 }
 
-export async function waitForSync(address: string, timeoutMs = 15_000): Promise<CachedWalletData | null> {
-  // Check if data already exists
+export async function waitForSync(address: string, timeoutMs = SYNC_TIMEOUT_MS): Promise<CachedWalletData | null> {
   const existing = await getJson<CachedWalletData>(KEYS.walletData(address));
   if (existing) return existing;
 
-  // Enqueue and wait
   const job = await syncQueue.add("sync-wallet", { address }, {
     jobId: `sync-wallet-${address}-wait-${Date.now()}`,
     priority: 1,
   });
 
-  const result = await job.waitUntilFinished(queueEvents, timeoutMs);
-  return result as CachedWalletData;
+  return await job.waitUntilFinished(queueEvents, timeoutMs) as CachedWalletData;
 }
 
 export async function cleanupAddress(address: string): Promise<void> {

@@ -233,7 +233,6 @@ export function WalletCard({
         },
       }}
     >
-      {/* Header */}
       <Box sx={{ px: { xs: 2.5, md: 3 }, py: 2.5, borderBottom: expanded ? "1px solid" : "none", borderColor: "divider" }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, minWidth: 0 }}>
@@ -361,7 +360,6 @@ export function WalletCard({
         </Box>
       </Box>
 
-      {/* Body */}
       <Collapse in={expanded}>
         <CardContent sx={{ px: { xs: 2, md: 2.5 }, py: 1.5, "&:last-child": { pb: 2 } }}>
           {isLoading && (
@@ -413,7 +411,6 @@ export function WalletCard({
                 ))}
               </Box>
 
-              {/* Footer total - mobile */}
               <Divider sx={{ mt: 1.5 }} />
               <Box sx={{ display: { xs: "flex", sm: "none" }, justifyContent: "space-between", alignItems: "center", pt: 2 }}>
                 <Typography variant="body2" color="text.secondary" fontWeight={600}>

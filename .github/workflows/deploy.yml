@@ -13,13 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
@@ -68,6 +68,20 @@ jobs:
             --exclude='*.db' \
             --exclude='*.db-journal' \
             ./ ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}:${{ env.DEPLOY_PATH }}/
+
+      - name: Write API .env
+        run: |
+          ssh ${{ vars.VPS_USER }}@${{ vars.VPS_HOST }} "cat > ${{ env.DEPLOY_PATH }}/apps/api/.env" << EOF
+          NODE_ENV="production"
+          DATABASE_URL="${{ vars.DATABASE_URL }}"
+          GOOGLE_CLIENT_ID="${{ vars.GOOGLE_CLIENT_ID }}"
+          GOOGLE_CLIENT_SECRET="${{ secrets.GOOGLE_CLIENT_SECRET }}"
+          JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          ALCHEMY_API_KEY="${{ secrets.ALCHEMY_API_KEY }}"
+          REDIS_URL="${{ secrets.REDIS_URL }}"
+          FRONTEND_URL="${{ vars.FRONTEND_URL }}"
+          PORT=${{ vars.PORT }}
+          EOF
 
       - name: Post-deploy setup
         run: |

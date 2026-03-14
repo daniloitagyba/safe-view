@@ -7,7 +7,7 @@ function parseRedisUrl(url: string) {
     host: parsed.hostname || "127.0.0.1",
     port: parseInt(parsed.port || "6379", 10),
     password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
-    maxRetriesPerRequest: null as null, // required by BullMQ
+    maxRetriesPerRequest: null as null,
   };
 }
 
@@ -21,7 +21,8 @@ export async function getJson<T>(key: string): Promise<T | null> {
   try {
     return JSON.parse(raw) as T;
   } catch {
-    console.error(`Corrupted JSON in Redis key: ${key}`);
+    const { logger } = await import("./logger.js");
+    logger.warn({ key }, "Corrupted JSON in Redis, key deleted");
     await redis.del(key);
     return null;
   }

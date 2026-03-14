@@ -3,20 +3,20 @@ import { buildApp } from "./app.js";
 import { env } from "./config/env.js";
 import { initWorker, shutdownWorker } from "./lib/sync-worker.js";
 import { redis } from "./lib/redis.js";
+import { logger } from "./lib/logger.js";
 
 const app = buildApp();
 
 app.listen({ port: env.PORT, host: "0.0.0.0" }, (err) => {
   if (err) {
-    app.log.error(err);
+    logger.error(err);
     process.exit(1);
   }
-
   initWorker();
 });
 
 async function gracefulShutdown(signal: string) {
-  console.log(`[server] ${signal} received, shutting down...`);
+  logger.info({ signal }, "Shutting down");
   await app.close();
   await shutdownWorker();
   await redis.quit();

@@ -12,10 +12,10 @@ import {
 } from "../../lib/sync-worker.js";
 import type { FiatCurrency, CachedWalletData } from "../../lib/alchemy.js";
 
-const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+const ETH_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 const addWalletSchema = z.object({
-  address: z.string().regex(ethAddressRegex, "Invalid Ethereum address"),
+  address: z.string().regex(ETH_ADDRESS_REGEX, "Invalid Ethereum address"),
   label: z.string().optional(),
 });
 
@@ -40,6 +40,7 @@ function buildBalancesResponse(
 ) {
   const ethBalance = parseFloat(data.ethBalanceWei) / 1e18;
   const ethPrice = data.ethPrices[currency];
+  const ethValue = ethBalance * ethPrice;
 
   const tokensWithValue = data.tokens.map((token) => ({
     ...token,
@@ -58,11 +59,15 @@ function buildBalancesResponse(
     currency,
     ethBalance,
     ethPrice,
-    ethValue: ethBalance * ethPrice,
-    totalValue: ethBalance * ethPrice + tokensTotal,
+    ethValue,
+    totalValue: ethValue + tokensTotal,
     tokens: tokensWithValue,
     syncedAt: data.syncedAt,
   };
+}
+
+async function findUserWallet(userId: string, walletId: string) {
+  return prisma.wallet.findFirst({ where: { id: walletId, userId } });
 }
 
 export async function walletRoutes(app: FastifyInstance) {
@@ -82,13 +87,10 @@ export async function walletRoutes(app: FastifyInstance) {
   app.post("/wallets", async (request, reply) => {
     const { userId } = request as AuthenticatedRequest;
     const { address, label } = addWalletSchema.parse(request.body);
-
     const normalizedAddress = address.toLowerCase();
 
     const existing = await prisma.wallet.findUnique({
-      where: {
-        userId_address: { userId, address: normalizedAddress },
-      },
+      where: { userId_address: { userId, address: normalizedAddress } },
     });
 
     if (existing) {
@@ -96,14 +98,9 @@ export async function walletRoutes(app: FastifyInstance) {
     }
 
     const wallet = await prisma.wallet.create({
-      data: {
-        address: normalizedAddress,
-        label,
-        userId,
-      },
+      data: { address: normalizedAddress, label, userId },
     });
 
-    // Enqueue background sync for the new wallet
     await enqueueSyncWallet(normalizedAddress, 1);
 
     return reply.status(201).send({ wallet });
@@ -114,10 +111,7 @@ export async function walletRoutes(app: FastifyInstance) {
     const { id } = walletParamsSchema.parse(request.params);
     const { label } = updateWalletSchema.parse(request.body);
 
-    const wallet = await prisma.wallet.findFirst({
-      where: { id, userId },
-    });
-
+    const wallet = await findUserWallet(userId, id);
     if (!wallet) {
       return reply.status(404).send({ error: "Wallet not found" });
     }
@@ -134,71 +128,50 @@ export async function walletRoutes(app: FastifyInstance) {
     const { userId } = request as AuthenticatedRequest;
     const { id } = walletParamsSchema.parse(request.params);
 
-    const wallet = await prisma.wallet.findFirst({
-      where: { id, userId },
-    });
-
+    const wallet = await findUserWallet(userId, id);
     if (!wallet) {
       return reply.status(404).send({ error: "Wallet not found" });
     }
 
     await prisma.wallet.delete({ where: { id } });
-
-    // Clean up Redis if no one else uses this address
     await cleanupAddress(wallet.address);
 
     return reply.status(204).send();
   });
 
-  // GET /wallets/:id/balances — reads from Redis cache
   app.get("/wallets/:id/balances", async (request, reply) => {
     const { userId } = request as AuthenticatedRequest;
     const { id } = walletParamsSchema.parse(request.params);
 
-    const wallet = await prisma.wallet.findFirst({
-      where: { id, userId },
-    });
-
+    const wallet = await findUserWallet(userId, id);
     if (!wallet) {
       return reply.status(404).send({ error: "Wallet not found" });
     }
 
     const { currency } = balancesQuerySchema.parse(request.query);
 
-    // Try cache first
-    let data = await getJson<CachedWalletData>(
-      KEYS.walletData(wallet.address)
-    );
+    let data = await getJson<CachedWalletData>(KEYS.walletData(wallet.address));
 
-    // Cache miss: enqueue and wait
     if (!data) {
       try {
-        data = await waitForSync(wallet.address, 15_000);
+        data = await waitForSync(wallet.address);
       } catch {
-        return reply
-          .status(504)
-          .send({ error: "Sync timed out. Try again shortly." });
+        return reply.status(504).send({ error: "Sync timed out. Try again shortly." });
       }
     }
 
     if (!data) {
-      return reply
-        .status(504)
-        .send({ error: "Sync timed out. Try again shortly." });
+      return reply.status(504).send({ error: "Sync timed out. Try again shortly." });
     }
 
     return buildBalancesResponse(wallet.address, currency, data);
   });
 
-  // POST /wallets/:id/refresh — invalidates cache, syncs immediately
   app.post("/wallets/:id/refresh", async (request, reply) => {
     const { userId } = request as AuthenticatedRequest;
     const { id } = walletParamsSchema.parse(request.params);
 
-    const wallet = await prisma.wallet.findFirst({
-      where: { id, userId },
-    });
-
+    const wallet = await findUserWallet(userId, id);
     if (!wallet) {
       return reply.status(404).send({ error: "Wallet not found" });
     }
@@ -209,9 +182,7 @@ export async function walletRoutes(app: FastifyInstance) {
       const data = await invalidateAndSync(wallet.address);
       return buildBalancesResponse(wallet.address, currency, data);
     } catch {
-      return reply
-        .status(504)
-        .send({ error: "Sync timed out. Try again shortly." });
+      return reply.status(504).send({ error: "Sync timed out. Try again shortly." });
     }
   });
 }
