@@ -1,6 +1,5 @@
 import { Queue, QueueEvents, Worker, type Job } from "bullmq";
-import { env } from "../config/env.js";
-import { getJson, setJson, del } from "./redis.js";
+import { redisOptions, getJson, setJson, del } from "./redis.js";
 import { prisma } from "./prisma.js";
 import {
   getEthBalance,
@@ -11,10 +10,8 @@ import {
 
 const QUEUE_NAME = "wallet-sync";
 
-const connection = { url: env.REDIS_URL };
-
 export const syncQueue = new Queue(QUEUE_NAME, {
-  connection,
+  connection: redisOptions,
   defaultJobOptions: {
     removeOnComplete: 100,
     removeOnFail: 200,
@@ -23,7 +20,7 @@ export const syncQueue = new Queue(QUEUE_NAME, {
   },
 });
 
-const queueEvents = new QueueEvents(QUEUE_NAME, { connection });
+const queueEvents = new QueueEvents(QUEUE_NAME, { connection: redisOptions });
 
 // ---------------------------------------------------------------------------
 // Redis key helpers
@@ -96,7 +93,7 @@ export function initWorker() {
       throw new Error(`Unknown job: ${job.name}`);
     },
     {
-      connection,
+      connection: redisOptions,
       concurrency: 2,
       limiter: { max: 5, duration: 1000 },
     }
