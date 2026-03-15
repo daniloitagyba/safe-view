@@ -9,6 +9,7 @@
     "dev:web": "pnpm --filter @safe-view/web dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
     "db:migrate": "pnpm --filter @safe-view/api db:migrate",
     "db:generate": "pnpm --filter @safe-view/api db:generate"
   },
