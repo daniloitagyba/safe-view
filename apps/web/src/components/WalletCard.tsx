@@ -137,10 +137,11 @@ function TokenRow({
           sx={{
             width: 36,
             height: 36,
-            bgcolor: fallbackColor,
+            bgcolor: "#ffffff",
             fontSize: 14,
             fontWeight: 800,
-            color: "#fff",
+            color: fallbackColor,
+            "& img": { objectFit: "contain", p: 0.25 },
           }}
         >
           {fallbackChar}

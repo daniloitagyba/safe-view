@@ -6,7 +6,8 @@ import {
   Box,
   CircularProgress,
 } from "@mui/material";
-import { Add } from "@mui/icons-material";
+import { Add, ContentPaste } from "@mui/icons-material";
+import { IconButton, InputAdornment } from "@mui/material";
 import toast from "react-hot-toast";
 
 interface AddWalletFormProps {
@@ -64,6 +65,24 @@ export function AddWalletForm({ onAdd }: AddWalletFormProps) {
             helperText={
               address.length > 0 && !isValid ? "Invalid Ethereum address" : " "
             }
+            slotProps={{
+              input: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={async () => {
+                        const text = await navigator.clipboard.readText();
+                        setAddress(text.trim());
+                      }}
+                      edge="end"
+                    >
+                      <ContentPaste fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            }}
           />
           <TextField
             label="Label (optional)"

@@ -3,7 +3,7 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "react-hot-toast";
 import { CircularProgress, Box } from "@mui/material";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { ThemeProvider } from "./contexts/ThemeContext";
+import { ThemeProvider, useThemeMode } from "./contexts/ThemeContext";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
 
@@ -68,6 +68,36 @@ function AppRoutes() {
   );
 }
 
+function ThemedToaster() {
+  const { mode } = useThemeMode();
+  const isDark = mode === "dark";
+
+  return (
+    <Toaster
+      position="top-right"
+      toastOptions={{
+        style: {
+          background: isDark ? "#141824" : "#ffffff",
+          color: isDark ? "#e8eaf0" : "#1a1d2e",
+          border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
+        },
+        success: {
+          iconTheme: {
+            primary: isDark ? "#00e5a0" : "#00b87a",
+            secondary: isDark ? "#141824" : "#ffffff",
+          },
+        },
+        error: {
+          iconTheme: {
+            primary: "#ff4b4b",
+            secondary: isDark ? "#141824" : "#ffffff",
+          },
+        },
+      }}
+    />
+  );
+}
+
 export default function App() {
   return (
     <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
@@ -75,7 +105,7 @@ export default function App() {
         <BrowserRouter>
           <AuthProvider>
             <AppRoutes />
-            <Toaster position="top-right" />
+            <ThemedToaster />
           </AuthProvider>
         </BrowserRouter>
       </ThemeProvider>

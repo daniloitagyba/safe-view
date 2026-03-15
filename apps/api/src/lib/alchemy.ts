@@ -5,7 +5,7 @@ const ALCHEMY_URL = `https://eth-mainnet.g.alchemy.com/v2/${env.ALCHEMY_API_KEY}
 const CRYPTOCOMPARE_PRICES_URL =
   "https://min-api.cryptocompare.com/data/price?fsym=ETH&tsyms=USD,EUR,BRL";
 
-export type FiatCurrency = "usd" | "eur" | "brl";
+export type FiatCurrency = "usd" | "brl";
 
 export interface EthPrices {
   usd: number;
@@ -150,36 +150,43 @@ export async function getTokenBalances(address: string): Promise<TokenBalance[]>
 
   if (nonZeroTokens.length === 0) return [];
 
-  const metadataList: { token: AlchemyTokenBalance; metadata: AlchemyTokenMetadata }[] = [];
+  const settled = await Promise.allSettled(
+    nonZeroTokens.map(async (token) => ({
+      token,
+      metadata: await getTokenMetadata(token.contractAddress),
+    }))
+  );
 
-  for (const token of nonZeroTokens) {
-    try {
-      const metadata = await getTokenMetadata(token.contractAddress);
-      metadataList.push({ token, metadata });
-    } catch {
-      // skip tokens with unreachable metadata
-    }
-  }
+  const metadataList = settled
+    .filter((r): r is PromiseFulfilledResult<{ token: AlchemyTokenBalance; metadata: AlchemyTokenMetadata }> =>
+      r.status === "fulfilled"
+    )
+    .map((r) => r.value);
 
   const symbols = metadataList.map((m) => m.metadata.symbol).filter(Boolean);
   const priceMap = await getTokenPrices(symbols);
 
-  return metadataList.map(({ token, metadata }) => {
-    const decimals = metadata.decimals || 18;
-    const balanceFormatted = Number(BigInt(token.tokenBalance)) / Math.pow(10, decimals);
-    const symbol = (metadata.symbol || "").toUpperCase();
+  return metadataList
+    .filter(({ metadata }) => {
+      const symbol = (metadata.symbol || "").toUpperCase();
+      return priceMap.has(symbol);
+    })
+    .map(({ token, metadata }) => {
+      const decimals = metadata.decimals || 18;
+      const balanceFormatted = Number(BigInt(token.tokenBalance)) / Math.pow(10, decimals);
+      const symbol = (metadata.symbol || "").toUpperCase();
 
-    return {
-      contractAddress: token.contractAddress,
-      tokenName: metadata.name || "Unknown",
-      tokenSymbol: metadata.symbol || "???",
-      tokenDecimal: decimals,
-      balance: BigInt(token.tokenBalance).toString(),
-      balanceFormatted,
-      imageUrl: metadata.logo || buildTokenLogoUrl(token.contractAddress),
-      prices: priceMap.get(symbol) ?? null,
-    };
-  });
+      return {
+        contractAddress: token.contractAddress,
+        tokenName: metadata.name || "Unknown",
+        tokenSymbol: metadata.symbol || "???",
+        tokenDecimal: decimals,
+        balance: BigInt(token.tokenBalance).toString(),
+        balanceFormatted,
+        imageUrl: metadata.logo || buildTokenLogoUrl(token.contractAddress),
+        prices: priceMap.get(symbol)!,
+      };
+    });
 }
 
 export async function getEthPrices(): Promise<EthPrices> {

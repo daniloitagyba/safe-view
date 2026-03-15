@@ -62,12 +62,14 @@ async function processSyncAll() {
     distinct: ["address"],
   });
 
-  for (const { address } of wallets) {
-    await syncQueue.add("sync-wallet", { address }, {
-      jobId: `sync-wallet-${address}`,
-      priority: 10,
-    });
-  }
+  await Promise.all(
+    wallets.map(({ address }) =>
+      syncQueue.add("sync-wallet", { address }, {
+        jobId: `sync-wallet-${address}`,
+        priority: 10,
+      })
+    )
+  );
 
   return { synced: wallets.length };
 }
