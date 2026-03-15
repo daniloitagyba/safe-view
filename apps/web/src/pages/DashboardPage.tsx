@@ -21,7 +21,6 @@ const CURRENCY_OPTIONS: { value: FiatCurrency; flag: string; label: string }[] =
 
 const CURRENCY_CODE: Record<FiatCurrency, string> = {
   usd: "USD",
-  eur: "EUR",
   brl: "BRL",
 };
 

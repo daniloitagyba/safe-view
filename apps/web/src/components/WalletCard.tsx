@@ -37,7 +37,6 @@ interface WalletCardProps {
 
 const CURRENCY_CODE: Record<FiatCurrency, string> = {
   usd: "USD",
-  eur: "EUR",
   brl: "BRL",
 };
 
