@@ -111,6 +111,9 @@ pnpm dev
 | `pnpm dev:web` | Start Web only |
 | `pnpm build` | Build all packages |
 | `pnpm lint` | Lint all packages |
+| `pnpm test` | Run unit & integration tests |
+| `pnpm test:e2e` | Run Playwright e2e tests |
+| `pnpm test:e2e:ui` | Open Playwright interactive UI |
 | `pnpm db:migrate` | Run Prisma migrations |
 | `pnpm db:generate` | Regenerate Prisma Client |
 
@@ -169,6 +172,44 @@ safe-view/
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/health` | Health check (includes Redis status) |
+
+## Tests
+
+### Unit & Integration Tests (Vitest)
+
+Testes unitários e de integração para API e frontend usando Vitest.
+
+```bash
+pnpm test              # Executa todos os testes
+pnpm test:watch        # Modo watch
+pnpm test:coverage     # Relatório de cobertura
+```
+
+| Pacote | Arquivos | Cobertura |
+|--------|----------|-----------|
+| `apps/api` | 5 suites, 41 testes | Rotas de auth, rotas de wallet, Alchemy API, health check, error handler |
+| `apps/web` | 9 suites, 64 testes | Contextos (Auth, Theme), páginas (Login, Dashboard), componentes (Header, WalletCard, AddWalletForm), hooks, API service |
+
+### E2E Tests (Playwright)
+
+Testes end-to-end com Playwright cobrindo todos os fluxos de usuário. As APIs são mockadas via `page.route()` para testes rápidos e determinísticos, sem necessidade do backend rodando.
+
+```bash
+pnpm test:e2e          # Executa em headless
+pnpm test:e2e:headed   # Executa com browser visível
+pnpm test:e2e:ui       # Interface interativa do Playwright
+```
+
+| Arquivo | Testes | Cobertura |
+|---------|--------|-----------|
+| `e2e/auth.spec.ts` | 6 | Tela de login, proteção de rotas, menu do usuário, logout |
+| `e2e/dashboard.spec.ts` | 6 | Estado vazio, lista de wallets, total geral, controles |
+| `e2e/wallet-management.spec.ts` | 10 | Adicionar wallet (validação, sucesso, erros), editar label (salvar, cancelar, teclado), remover |
+| `e2e/wallet-card.spec.ts` | 7 | Label, endereço, saldos ETH/tokens, total, refresh |
+| `e2e/currency-and-filters.spec.ts` | 7 | Toggle USD/BRL, persistência em localStorage, filtro de saldos pequenos |
+| `e2e/theme.spec.ts` | 3 | Toggle de tema, persistência, ida e volta |
+
+**Total: 40 testes e2e**
 
 ## Deployment
 

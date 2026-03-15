@@ -10,6 +10,7 @@ export function LoginPage() {
 
   return (
     <Box
+      data-testid="login-page"
       sx={{
         minHeight: "100vh",
         display: "flex",
@@ -52,10 +53,10 @@ export function LoginPage() {
           S
         </Box>
 
-        <Typography variant="h4" fontWeight={800} gutterBottom sx={{ color: "#e8eaf0" }}>
+        <Typography data-testid="login-title" variant="h4" fontWeight={800} gutterBottom sx={{ color: "#e8eaf0" }}>
           SafeView
         </Typography>
-        <Typography variant="body1" sx={{ color: "#8a8fa8", mb: 4 }}>
+        <Typography data-testid="login-subtitle" variant="body1" sx={{ color: "#8a8fa8", mb: 4 }}>
           Track your Ethereum portfolio — balances, tokens, and real-time values.
         </Typography>
 

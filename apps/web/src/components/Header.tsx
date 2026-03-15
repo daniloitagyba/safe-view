@@ -55,14 +55,14 @@ export function Header() {
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Tooltip title={mode === "dark" ? "Light mode" : "Dark mode"}>
-            <IconButton onClick={toggleTheme} color="inherit" size="small">
+            <IconButton data-testid="theme-toggle" onClick={toggleTheme} color="inherit" size="small">
               {mode === "dark" ? <LightMode fontSize="small" /> : <DarkMode fontSize="small" />}
             </IconButton>
           </Tooltip>
 
           {user && (
             <Box>
-              <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ ml: 0.5 }}>
+              <IconButton data-testid="user-menu-button" onClick={(e) => setAnchorEl(e.currentTarget)} sx={{ ml: 0.5 }}>
                 <Avatar
                   src={user.avatarUrl ?? undefined}
                   alt={user.name ?? "User"}
@@ -84,6 +84,7 @@ export function Header() {
                   <Typography variant="body2">{user.email}</Typography>
                 </MenuItem>
                 <MenuItem
+                  data-testid="logout-button"
                   onClick={() => {
                     setAnchorEl(null);
                     logout();

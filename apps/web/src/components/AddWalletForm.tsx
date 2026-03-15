@@ -56,6 +56,7 @@ export function AddWalletForm({ onAdd }: AddWalletFormProps) {
       <form onSubmit={handleSubmit}>
         <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 1.5, alignItems: { sm: "flex-start" } }}>
           <TextField
+            data-testid="wallet-address-input"
             label="Ethereum Address (0x...)"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -85,6 +86,7 @@ export function AddWalletForm({ onAdd }: AddWalletFormProps) {
             }}
           />
           <TextField
+            data-testid="wallet-label-input"
             label="Label (optional)"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
@@ -92,6 +94,7 @@ export function AddWalletForm({ onAdd }: AddWalletFormProps) {
             sx={{ minWidth: 160 }}
           />
           <Button
+            data-testid="add-wallet-button"
             type="submit"
             variant="contained"
             disabled={!isValid || isSubmitting}

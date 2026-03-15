@@ -11,10 +11,16 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "db:migrate": "pnpm --filter @safe-view/api db:migrate",
-    "db:generate": "pnpm --filter @safe-view/api db:generate"
+    "db:generate": "pnpm --filter @safe-view/api db:generate",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.27.0"
+  "packageManager": "pnpm@10.27.0",
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
 }

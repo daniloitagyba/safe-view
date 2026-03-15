@@ -217,6 +217,7 @@ export function WalletCard({
 
   return (
     <Card
+      data-testid={`wallet-card-${wallet.id}`}
       elevation={0}
       sx={{
         border: "1px solid",
@@ -257,6 +258,7 @@ export function WalletCard({
               {editing ? (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                   <TextField
+                    data-testid="edit-label-input"
                     value={editLabel}
                     onChange={(e) => setEditLabel(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -265,20 +267,21 @@ export function WalletCard({
                     placeholder="Wallet label"
                     sx={{ "& input": { py: 0.5, fontSize: 14 } }}
                   />
-                  <IconButton size="small" onClick={saveLabel} color="primary">
+                  <IconButton data-testid="save-label-button" size="small" onClick={saveLabel} color="primary">
                     <Check fontSize="small" />
                   </IconButton>
-                  <IconButton size="small" onClick={cancelEditing}>
+                  <IconButton data-testid="cancel-label-button" size="small" onClick={cancelEditing}>
                     <Close fontSize="small" />
                   </IconButton>
                 </Box>
               ) : (
                 <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                  <Typography variant="subtitle1" fontWeight={700} noWrap>
+                  <Typography data-testid="wallet-label" variant="subtitle1" fontWeight={700} noWrap>
                     {wallet.label || formatAddress(wallet.address)}
                   </Typography>
                   <Tooltip title="Edit label">
                     <IconButton
+                      data-testid="edit-label-button"
                       size="small"
                       onClick={startEditing}
                       sx={{ opacity: 0.4, "&:hover": { opacity: 1 } }}
@@ -321,6 +324,7 @@ export function WalletCard({
             )}
             <Tooltip title="Refresh balances">
               <IconButton
+                data-testid="refresh-button"
                 size="small"
                 onClick={refreshBalances}
                 disabled={isRefreshing}
@@ -349,6 +353,7 @@ export function WalletCard({
             </Tooltip>
             <Tooltip title="Remove wallet">
               <IconButton
+                data-testid="delete-wallet-button"
                 size="small"
                 onClick={() => onRemove(wallet.id)}
                 sx={{ opacity: 0.4, "&:hover": { opacity: 1, color: "error.main" } }}

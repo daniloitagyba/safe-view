@@ -66,17 +66,18 @@ export function DashboardPage() {
   const grandTotal = Object.values(walletTotals).reduce((sum, v) => sum + v, 0);
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
+    <Box data-testid="dashboard-page" sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
       <Header />
 
       <Box sx={{ maxWidth: 900, mx: "auto", px: { xs: 2, md: 3 }, py: 4, display: "flex", flexDirection: "column", gap: 3 }}>
         {/* Title + Grand Total */}
         <Box>
-          <Typography variant="h5" fontWeight={800} sx={{ letterSpacing: "-0.01em" }}>
+          <Typography data-testid="dashboard-title" variant="h5" fontWeight={800} sx={{ letterSpacing: "-0.01em" }}>
             My Wallets
           </Typography>
           {wallets.length > 0 && grandTotal > 0 && (
             <Typography
+              data-testid="grand-total"
               variant="h4"
               fontWeight={800}
               sx={{
@@ -94,6 +95,7 @@ export function DashboardPage() {
         {/* Controls */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
           <ToggleButtonGroup
+            data-testid="currency-toggle"
             value={currency}
             exclusive
             onChange={handleCurrencyChange}
@@ -119,6 +121,7 @@ export function DashboardPage() {
           </ToggleButtonGroup>
 
           <FormControlLabel
+            data-testid="hide-small-toggle"
             control={
               <Switch
                 checked={hideSmallBalances}
@@ -145,7 +148,7 @@ export function DashboardPage() {
         )}
 
         {!isLoading && wallets.length === 0 && (
-          <Box sx={{ textAlign: "center", py: 8 }}>
+          <Box data-testid="empty-state" sx={{ textAlign: "center", py: 8 }}>
             <Typography
               variant="h1"
               sx={{ fontSize: 56, mb: 2, opacity: 0.15 }}
@@ -161,7 +164,7 @@ export function DashboardPage() {
           </Box>
         )}
 
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <Box data-testid="wallet-list" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           {wallets.map((wallet) => (
             <WalletCard
               key={wallet.id}
