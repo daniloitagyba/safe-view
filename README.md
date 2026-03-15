@@ -177,39 +177,39 @@ safe-view/
 
 ### Unit & Integration Tests (Vitest)
 
-Testes unitários e de integração para API e frontend usando Vitest.
+Unit and integration tests for both API and frontend using Vitest.
 
 ```bash
-pnpm test              # Executa todos os testes
-pnpm test:watch        # Modo watch
-pnpm test:coverage     # Relatório de cobertura
+pnpm test              # Run all tests
+pnpm test:watch        # Watch mode
+pnpm test:coverage     # Coverage report
 ```
 
-| Pacote | Arquivos | Cobertura |
-|--------|----------|-----------|
-| `apps/api` | 5 suites, 41 testes | Rotas de auth, rotas de wallet, Alchemy API, health check, error handler |
-| `apps/web` | 9 suites, 64 testes | Contextos (Auth, Theme), páginas (Login, Dashboard), componentes (Header, WalletCard, AddWalletForm), hooks, API service |
+| Package | Files | Coverage |
+|---------|-------|----------|
+| `apps/api` | 5 suites, 41 tests | Auth routes, wallet routes, Alchemy API, health check, error handler |
+| `apps/web` | 9 suites, 64 tests | Contexts (Auth, Theme), pages (Login, Dashboard), components (Header, WalletCard, AddWalletForm), hooks, API service |
 
 ### E2E Tests (Playwright)
 
-Testes end-to-end com Playwright cobrindo todos os fluxos de usuário. As APIs são mockadas via `page.route()` para testes rápidos e determinísticos, sem necessidade do backend rodando.
+End-to-end tests with Playwright covering all user flows. APIs are mocked via `page.route()` for fast, deterministic tests without requiring the backend.
 
 ```bash
-pnpm test:e2e          # Executa em headless
-pnpm test:e2e:headed   # Executa com browser visível
-pnpm test:e2e:ui       # Interface interativa do Playwright
+pnpm test:e2e          # Run headless
+pnpm test:e2e:headed   # Run with visible browser
+pnpm test:e2e:ui       # Open Playwright interactive UI
 ```
 
-| Arquivo | Testes | Cobertura |
-|---------|--------|-----------|
-| `e2e/auth.spec.ts` | 6 | Tela de login, proteção de rotas, menu do usuário, logout |
-| `e2e/dashboard.spec.ts` | 6 | Estado vazio, lista de wallets, total geral, controles |
-| `e2e/wallet-management.spec.ts` | 10 | Adicionar wallet (validação, sucesso, erros), editar label (salvar, cancelar, teclado), remover |
-| `e2e/wallet-card.spec.ts` | 7 | Label, endereço, saldos ETH/tokens, total, refresh |
-| `e2e/currency-and-filters.spec.ts` | 7 | Toggle USD/BRL, persistência em localStorage, filtro de saldos pequenos |
-| `e2e/theme.spec.ts` | 3 | Toggle de tema, persistência, ida e volta |
+| File | Tests | Coverage |
+|------|-------|----------|
+| `e2e/auth.spec.ts` | 6 | Login page, route guards, user menu, logout |
+| `e2e/dashboard.spec.ts` | 6 | Empty state, wallet list, grand total, controls |
+| `e2e/wallet-management.spec.ts` | 10 | Add wallet (validation, success, errors), edit label (save, cancel, keyboard), delete |
+| `e2e/wallet-card.spec.ts` | 7 | Label, address, ETH/token balances, total, refresh |
+| `e2e/currency-and-filters.spec.ts` | 7 | USD/BRL toggle, localStorage persistence, hide small balances filter |
+| `e2e/theme.spec.ts` | 3 | Theme toggle, persistence, round-trip |
 
-**Total: 40 testes e2e**
+**Total: 40 e2e tests**
 
 ## Deployment
 
