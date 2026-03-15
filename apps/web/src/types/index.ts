@@ -1,4 +1,4 @@
-export type FiatCurrency = "usd" | "eur" | "brl";
+export type FiatCurrency = "usd" | "brl";
 
 export interface User {
   id: string;

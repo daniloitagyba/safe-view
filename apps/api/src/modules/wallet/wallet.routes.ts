@@ -28,7 +28,7 @@ const updateWalletSchema = z.object({
 });
 
 const balancesQuerySchema = z.object({
-  currency: z.enum(["usd", "eur", "brl"]).default("usd"),
+  currency: z.enum(["usd", "brl"]).default("usd"),
 });
 
 type AuthenticatedRequest = FastifyRequest & { userId: string };
